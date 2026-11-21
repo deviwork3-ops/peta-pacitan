@@ -22,7 +22,17 @@ const API = 'https://script.google.com/macros/s/AKfycbyRdG5LJuBzZGrGWysgOBAI_Cuz
 const batas = L.latLngBounds([-8.45, 110.70], [-7.95, 111.55]);
 const peta = L.map('peta', { maxBounds: batas, maxBoundsViscosity: 1.0, minZoom: 10 })
   .setView([-8.20, 111.10], 11);
-const petaBiasa = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {\\n  attribution: '&copy; OpenStreetMap',\\n  maxZoom: 19\\n});\\n\\nconst satelit = L.tileLayer(\\n  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {\\n  attribution: 'Tiles &copy; Esri',\\n  maxZoom: 19\\n});\\n\\nsatelit.addTo(peta);\\n\\nL.control.layers({ 'Satelit': satelit, 'Peta': petaBiasa }).addTo(peta);
+const petaBiasa = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap',
+  maxZoom: 19
+});
+const satelit = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri',
+    maxZoom: 19
+  });
+  satelit.addTo(peta);
+  L.control.layers({ 'Satelit': satelit, 'Peta': petaBiasa }).addTo(peta);
 
 
 const penanda = {};
