@@ -36,18 +36,39 @@ const satelit = L.tileLayer(
 
 
 const penanda = {};
+  const KECAMATAN = ['Pacitan', 'Kebonagung', 'Arjosari', 'Punung', 'Pringkuku', 'Donorojo', 'Tegalombo', 'Nawangan', 'Bandar', 'Tulakan', 'Ngadirojo', 'Sudimoro'];
+const WARNA_KEC = ['#e53935', '#8e24aa', '#3949ab', '#039be5', '#00897b', '#43a047', '#c0ca33', '#fb8c00', '#6d4c41', '#546e7a', '#d81b60', '#5e35b1'];
+
+function ikonKecamatan(kec) {
+  const i = KECAMATAN.indexOf(kec);
+  const warna = i >= 0 ? WARNA_KEC[i] : '#757575';
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:20px;height:20px;border-radius:50%;background:' + warna + ';border:3px solid white;box-shadow:0 0 4px rgba(0,0,0,.6)"></div>',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
+  });
+}
+
+function pilihKecamatan(awal) {
+  const teks = KECAMATAN.map(function (k, i) { return (i + 1) + '. ' + k; }).join('\n');
+  const jawab = prompt('Kecamatan (ketik nomornya):\n' + teks, awal ? String(KECAMATAN.indexOf(awal) + 1) : '');
+  const n = parseInt(jawab, 10);
+  return n >= 1 && n <= KECAMATAN.length ? KECAMATAN[n - 1] : (awal || '');
+}
 
 function kirim(data) {
   return fetch(API, { method: 'POST', body: JSON.stringify(data) });
 }
 
 function pasang(d) {
-  const m = L.marker([d.lat, d.lng]).addTo(peta);
+    const m = L.marker([d.lat, d.lng], { icon: ikonKecamatan(d.kecamatan) }).addTo(peta);
+  m.kecamatan = d.kecamatan || '';
   m.on('click', function () { if (modeGaris) { m.closePopup(); pilihUntukGaris(d.id); } });
   m.nama = d.nama;
   m.bindPopup(function () {
     const div = document.createElement('div');
-    div.innerHTML = '<b>' + d.nama + '</b><br>' + (d.catatan || '') + '<br>';
+        div.innerHTML = '<b>' + d.nama + '</b><br>' + (d.kecamatan ? 'Kec. ' + d.kecamatan + '<br>' : '') + (d.catatan || '') + '<br>';
     const ubah = document.createElement('button');
     ubah.textContent = 'Ubah';
     ubah.onclick = function () {
@@ -56,7 +77,10 @@ function pasang(d) {
       const c = prompt('Catatan:', d.catatan || '');
       d.nama = n; d.catatan = c || '';
       m.nama = n;
-      kirim({ aksi: 'ubah', id: d.id, nama: d.nama, lat: d.lat, lng: d.lng, catatan: d.catatan });
+      d.kecamatan = pilihKecamatan(d.kecamatan);
+      m.kecamatan = d.kecamatan;
+      m.setIcon(ikonKecamatan(d.kecamatan));
+      kirim({ aksi: 'ubah', id: d.id, nama: d.nama, lat: d.lat, lng: d.lng, catatan: d.catatan, kecamatan: d.kecamatan });
       m.closePopup();
     };
     const hapus = document.createElement('button');
@@ -147,7 +171,8 @@ peta.on('click', function (e) {if (modeGaris || modeBebas) return;
   const nama = prompt('Rumah siapa di titik ini?');
   if (!nama) return;
   const catatan = prompt('Catatan (boleh kosong):') || '';
-  const d = { id: Date.now(), nama: nama, lat: e.latlng.lat, lng: e.latlng.lng, catatan: catatan };
+    const kecamatan = pilihKecamatan('');
+  const d = { id: Date.now(), nama: nama, lat: e.latlng.lat, lng: e.latlng.lng, catatan: catatan, kecamatan: kecamatan };
   pasang(d);
   kirim(Object.assign({ aksi: 'tambah' }, d));
 });
@@ -166,9 +191,53 @@ btnDaftar.textContent = 'Daftar';
 btnDaftar.style.cssText = 'position:absolute;z-index:1000;right:10px;bottom:25px;padding:10px 14px;font-size:15px;border:none;border-radius:8px;background:white;box-shadow:0 1px 5px rgba(0,0,0,.4)';
 document.body.appendChild(btnDaftar);
 
-const panelDaftar = document.createElement('div');
-panelDaftar.style.cssText = 'position:absolute;z-index:1001;right:10px;bottom:75px;width:240px;max-height:55%;overflow:auto;background:white;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.4);display:none';
-document.body.appendChild(panelDaftar);
+function isiDaftar() {
+  const q = document.getElementById('cari').value.toLowerCase();
+  const ids = Object.keys(penanda).filter(function (id) {
+    return !q || penanda[id].nama.toLowerCase().indexOf(q) !== -1;
+  });
+  const kelompok = {};
+  ids.forEach(function (id) {
+    const k = penanda[id].kecamatan || 'Belum ada kecamatan';
+    (kelompok[k] = kelompok[k] || []).push(id);
+  });
+  panelDaftar.innerHTML = '<div style="padding:8px;font-weight:bold">Rumah ditandai: ' + ids.length + '</div>';
+  Object.keys(kelompok).sort().forEach(function (k) {
+    const judul = document.createElement('div');
+    judul.textContent = k + ' (' + kelompok[k].length + ')';
+    judul.style.cssText = 'padding:6px 8px;background:#eee;font-weight:bold';
+    panelDaftar.appendChild(judul);
+    kelompok[k].sort(function (a, b) {
+      return penanda[a].nama.localeCompare(penanda[b].nama);
+    }).forEach(function (id) {
+      const item = document.createElement('div');
+      item.textContent = penanda[id].nama;
+      item.style.cssText = 'padding:10px 8px;border-top:1px solid #eee;cursor:pointer';
+      item.onclick = function () {
+        const m = penanda[id];
+        if (!peta.hasLayer(m)) m.addTo(peta);
+        peta.flyTo(m.getLatLng(), 17);
+        m.openPopup();
+        panelDaftar.style.display = 'none';
+      };
+      panelDaftar.appendChild(item);
+    });
+  });
+}
+
+  const pilihKec = document.createElement('select');
+pilihKec.style.cssText = 'position:absolute;z-index:1000;top:60px;left:50px;right:10px;padding:8px;font-size:15px;border-radius:8px';
+pilihKec.innerHTML = '<option value="">Semua kecamatan</option>' +
+  KECAMATAN.map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join('');
+document.body.appendChild(pilihKec);
+
+pilihKec.onchange = function () {
+  const k = pilihKec.value;
+  Object.keys(penanda).forEach(function (id) {
+    const m = penanda[id];
+    if (!k || m.kecamatan === k) m.addTo(peta); else peta.removeLayer(m);
+  });
+};
 
 function isiDaftar() {
   const q = document.getElementById('cari').value.toLowerCase();
