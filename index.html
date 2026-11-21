@@ -29,7 +29,7 @@ const petaBiasa = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', 
 const satelit = L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
-    maxZoom: 19
+    maxZoom: 18
   });
   satelit.addTo(peta);
   L.control.layers({ 'Satelit': satelit, 'Peta': petaBiasa }).addTo(peta);
@@ -43,6 +43,7 @@ function kirim(data) {
 
 function pasang(d) {
   const m = L.marker([d.lat, d.lng]).addTo(peta);
+  m.on('click', function () { if (modeGaris) { m.closePopup(); pilihUntukGaris(d.id); } });
   m.nama = d.nama;
   m.bindPopup(function () {
     const div = document.createElement('div');
@@ -73,10 +74,79 @@ function pasang(d) {
   penanda[d.id] = m;
 }
 
-fetch(API).then(function (r) { return r.json(); })
-  .then(function (daftar) { daftar.forEach(pasang); });
+const garisan = {};
+const WARNA = { merah: '#e53935', hijau: '#43a047', kuning: '#fdd835', biru: '#1e88e5', hitam: '#000000' };
 
-peta.on('click', function (e) {
+function pasangGaris(g) {
+  const a = penanda[g.dari];
+  const b = penanda[g.ke];
+  if (!a || !b) return;
+  const garis = L.polyline([a.getLatLng(), b.getLatLng()], {
+    color: WARNA[g.warna] || '#000000', weight: 5
+  }).addTo(peta);
+  garis.bindPopup(function () {
+    const div = document.createElement('div');
+    div.innerHTML = 'Garis ' + a.nama + ' ke ' + b.nama + '<br>';
+    const hapus = document.createElement('button');
+    hapus.textContent = 'Hapus garis';
+    hapus.onclick = function () {
+      kirim({ aksi: 'hapusGaris', id: g.id });
+      peta.removeLayer(garis);
+      delete garisan[g.id];
+    };
+    div.appendChild(hapus);
+    return div;
+  });
+  garisan[g.id] = garis;
+}
+
+fetch(API).then(function (r) { return r.json(); })
+  .then(function (data) {
+    data.penanda.forEach(pasang);
+    data.garis.forEach(pasangGaris);
+  });
+
+  let modeGaris = false;
+let titikAwal = null;
+
+const panel = document.createElement('div');
+panel.style.cssText = 'position:absolute;z-index:1000;left:10px;bottom:25px;background:white;padding:8px;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.4)';
+panel.innerHTML = '<button id="btnGaris">Buat Garis</button> ' +
+  '<select id="pilihWarna">' +
+  '<option value="merah">Merah</option>' +
+  '<option value="hijau">Hijau</option>' +
+  '<option value="kuning">Kuning</option>' +
+  '<option value="biru">Biru</option>' +
+  '<option value="hitam">Hitam</option>' +
+  '</select><div id="infoGaris" style="margin-top:4px;font-size:13px"></div>';
+document.body.appendChild(panel);
+
+document.getElementById('btnGaris').onclick = function () {
+  modeGaris = !modeGaris;
+  titikAwal = null;
+  this.textContent = modeGaris ? 'Batal' : 'Buat Garis';
+  document.getElementById('infoGaris').textContent = modeGaris ? 'Ketuk rumah pertama' : '';
+};
+
+function pilihUntukGaris(id) {
+  const info = document.getElementById('infoGaris');
+  if (titikAwal === null) {
+    titikAwal = id;
+    info.textContent = 'Ketuk rumah kedua';
+    return;
+  }
+  if (id === titikAwal) return;
+  const g = { id: Date.now(), dari: titikAwal, ke: id,
+              warna: document.getElementById('pilihWarna').value };
+  pasangGaris(g);
+  kirim(Object.assign({ aksi: 'tambahGaris' }, g));
+  titikAwal = null;
+  modeGaris = false;
+  document.getElementById('btnGaris').textContent = 'Buat Garis';
+  info.textContent = '';
+}
+
+peta.on('click', function (e) {if (modeGaris) return; 
   const nama = prompt('Rumah siapa di titik ini?');
   if (!nama) return;
   const catatan = prompt('Catatan (boleh kosong):') || '';
