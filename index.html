@@ -190,6 +190,9 @@ document.getElementById('cari').addEventListener('input', function (e) {
 btnDaftar.textContent = 'Daftar';
 btnDaftar.style.cssText = 'position:absolute;z-index:1000;right:10px;bottom:25px;padding:10px 14px;font-size:15px;border:none;border-radius:8px;background:white;box-shadow:0 1px 5px rgba(0,0,0,.4)';
 document.body.appendChild(btnDaftar);
+ const panelDaftar = document.createElement('div');
+panelDaftar.style.cssText = 'position:absolute;z-index:1001;right:10px;bottom:75px;width:240px;max-height:55%;overflow:auto;background:white;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.4);display:none';
+document.body.appendChild(panelDaftar);
 
 function isiDaftar() {
   const q = document.getElementById('cari').value.toLowerCase();
