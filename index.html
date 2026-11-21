@@ -100,13 +100,10 @@ function pasangGaris(g) {
   garisan[g.id] = garis;
 }
 
-fetch(API).then(function (r) { return r.json(); })
-  .then(function (data) {
-    data.penanda.forEach(pasang);
-    data.garis.forEach(pasangGaris);
-  });
+
 
   let modeGaris = false;
+  let modeBebas = false;
 let titikAwal = null;
 
 const panel = document.createElement('div');
@@ -146,7 +143,7 @@ function pilihUntukGaris(id) {
   info.textContent = '';
 }
 
-peta.on('click', function (e) {if (modeGaris) return; 
+peta.on('click', function (e) {if (modeGaris || modeBebas) return; 
   const nama = prompt('Rumah siapa di titik ini?');
   if (!nama) return;
   const catatan = prompt('Catatan (boleh kosong):') || '';
@@ -210,6 +207,102 @@ document.getElementById('cari').addEventListener('input', function () {
   if (panelDaftar.style.display === 'block') isiDaftar();
 });
 
+  const garisBebasLayer = {};
+let titikBebas = [];
+let garisSementara = null;
+
+function pasangGarisBebas(g) {
+  const titik = typeof g.titik === 'string' ? JSON.parse(g.titik) : g.titik;
+  const garis = L.polyline(titik, { color: WARNA[g.warna] || '#000000', weight: 5 }).addTo(peta);
+  garis.bindPopup(function () {
+    const div = document.createElement('div');
+    div.innerHTML = 'Garis bebas<br>';
+    const hapus = document.createElement('button');
+    hapus.textContent = 'Hapus garis';
+    hapus.onclick = function () {
+      kirim({ aksi: 'hapusGarisBebas', id: g.id });
+      peta.removeLayer(garis);
+      delete garisBebasLayer[g.id];
+    };
+    div.appendChild(hapus);
+    return div;
+  });
+  garisBebasLayer[g.id] = garis;
+}
+
+const panelBebas = document.createElement('div');
+panelBebas.style.cssText = 'position:absolute;z-index:1000;left:10px;bottom:95px;background:white;padding:8px;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.4)';
+panelBebas.innerHTML = '<button id="btnBebas">Garis Bebas</button> ' +
+  '<select id="warnaBebas">' +
+  '<option value="merah">Merah</option>' +
+  '<option value="hijau">Hijau</option>' +
+  '<option value="kuning">Kuning</option>' +
+  '<option value="biru">Biru</option>' +
+  '<option value="hitam">Hitam</option>' +
+  '</select>' +
+  '<div id="aksiBebas" style="display:none;margin-top:6px">' +
+  '<button id="btnUndo">Undo</button> <button id="btnSelesai">Selesai</button> <button id="btnBatalBebas">Batal</button>' +
+  '</div><div id="infoBebas" style="margin-top:4px;font-size:13px"></div>';
+document.body.appendChild(panelBebas);
+
+function gambarSementara() {
+  if (garisSementara) peta.removeLayer(garisSementara);
+  garisSementara = null;
+  if (titikBebas.length > 0) {
+    garisSementara = L.polyline(titikBebas, {
+      color: WARNA[document.getElementById('warnaBebas').value], weight: 5, dashArray: '8 8'
+    }).addTo(peta);
+  }
+  document.getElementById('infoBebas').textContent = 'Titik: ' + titikBebas.length;
+}
+
+function akhiriBebas() {
+  modeBebas = false;
+  titikBebas = [];
+  if (garisSementara) peta.removeLayer(garisSementara);
+  garisSementara = null;
+  document.getElementById('aksiBebas').style.display = 'none';
+  document.getElementById('btnBebas').textContent = 'Garis Bebas';
+  document.getElementById('infoBebas').textContent = '';
+}
+
+document.getElementById('btnBebas').onclick = function () {
+  if (modeBebas) { akhiriBebas(); return; }
+  modeBebas = true;
+  titikBebas = [];
+  this.textContent = 'Menggambar...';
+  document.getElementById('aksiBebas').style.display = 'block';
+  document.getElementById('infoBebas').textContent = 'Ketuk peta untuk menambah titik';
+};
+
+document.getElementById('btnUndo').onclick = function () {
+  titikBebas.pop();
+  gambarSementara();
+};
+
+document.getElementById('btnBatalBebas').onclick = akhiriBebas;
+
+document.getElementById('btnSelesai').onclick = function () {
+  if (titikBebas.length < 2) { alert('Minimal dua titik.'); return; }
+  const g = { id: Date.now(), titik: titikBebas, warna: document.getElementById('warnaBebas').value };
+  pasangGarisBebas(g);
+  kirim(Object.assign({ aksi: 'tambahGarisBebas' }, g));
+  akhiriBebas();
+};
+
+peta.on('click', function (e) {
+  if (!modeBebas) return;
+  titikBebas.push([e.latlng.lat, e.latlng.lng]);
+  gambarSementara();
+});
+
+  fetch(API).then(function (r) { return r.json(); })
+  .then(function (data) {
+    data.penanda.forEach(pasang);
+    data.garis.forEach(pasangGaris);
+        (data.garisBebas || []).forEach(pasangGarisBebas);
+  });
+  
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
 </body>
