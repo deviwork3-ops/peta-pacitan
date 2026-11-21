@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peta Rumah Pacitan</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { height: 100%; margin: 0; font-family: sans-serif; }
+  #cari { position: absolute; z-index: 1000; top: 10px; left: 50px; right: 10px;
+          padding: 10px; font-size: 16px; border: 1px solid #999; border-radius: 8px; }
+  #peta { height: 100%; }
+</style>
+</head>
+<body>
+<input id="cari" placeholder="Cari nama pemilik rumah...">
+<div id="peta"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbyRdG5LJuBzZGrGWysgOBAI_Cuz0_FB6d-0COhoXO-9u96gIQd894RgcucE-iiDYLkwHA/exec';
+const batas = L.latLngBounds([-8.45, 110.70], [-7.95, 111.55]);
+const peta = L.map('peta', { maxBounds: batas, maxBoundsViscosity: 1.0, minZoom: 10 })
+  .setView([-8.20, 111.10], 11);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap'
+}).addTo(peta);
+
+const penanda = {};
+
+function kirim(data) {
+  return fetch(API, { method: 'POST', body: JSON.stringify(data) });
+}
+
+function pasang(d) {
+  const m = L.marker([d.lat, d.lng]).addTo(peta);
+  m.nama = d.nama;
+  m.bindPopup(function () {
+    const div = document.createElement('div');
+    div.innerHTML = '<b>' + d.nama + '</b><br>' + (d.catatan || '') + '<br>';
+    const ubah = document.createElement('button');
+    ubah.textContent = 'Ubah';
+    ubah.onclick = function () {
+      const n = prompt('Nama pemilik rumah:', d.nama);
+      if (n === null) return;
+      const c = prompt('Catatan:', d.catatan || '');
+      d.nama = n; d.catatan = c || '';
+      m.nama = n;
+      kirim({ aksi: 'ubah', id: d.id, nama: d.nama, lat: d.lat, lng: d.lng, catatan: d.catatan });
+      m.closePopup();
+    };
+    const hapus = document.createElement('button');
+    hapus.textContent = 'Hapus';
+    hapus.onclick = function () {
+      if (!confirm('Hapus penanda ini?')) return;
+      kirim({ aksi: 'hapus', id: d.id });
+      peta.removeLayer(m);
+      delete penanda[d.id];
+    };
+    div.appendChild(ubah);
+    div.appendChild(hapus);
+    return div;
+  });
+  penanda[d.id] = m;
+}
+
+fetch(API).then(function (r) { return r.json(); })
+  .then(function (daftar) { daftar.forEach(pasang); });
+
+peta.on('click', function (e) {
+  const nama = prompt('Rumah siapa di titik ini?');
+  if (!nama) return;
+  const catatan = prompt('Catatan (boleh kosong):') || '';
+  const d = { id: Date.now(), nama: nama, lat: e.latlng.lat, lng: e.latlng.lng, catatan: catatan };
+  pasang(d);
+  kirim(Object.assign({ aksi: 'tambah' }, d));
+});
+
+document.getElementById('cari').addEventListener('input', function (e) {
+  const q = e.target.value.toLowerCase();
+  Object.keys(penanda).forEach(function (id) {
+    const m = penanda[id];
+    const cocok = !q || m.nama.toLowerCase().indexOf(q) !== -1;
+    if (cocok) m.addTo(peta); else peta.removeLayer(m);
+  });
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
