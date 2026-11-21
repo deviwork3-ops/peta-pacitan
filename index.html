@@ -164,6 +164,52 @@ document.getElementById('cari').addEventListener('input', function (e) {
   });
 });
 
+  const btnDaftar = document.createElement('button');
+btnDaftar.textContent = 'Daftar';
+btnDaftar.style.cssText = 'position:absolute;z-index:1000;right:10px;bottom:25px;padding:10px 14px;font-size:15px;border:none;border-radius:8px;background:white;box-shadow:0 1px 5px rgba(0,0,0,.4)';
+document.body.appendChild(btnDaftar);
+
+const panelDaftar = document.createElement('div');
+panelDaftar.style.cssText = 'position:absolute;z-index:1001;right:10px;bottom:75px;width:240px;max-height:55%;overflow:auto;background:white;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.4);display:none';
+document.body.appendChild(panelDaftar);
+
+function isiDaftar() {
+  const q = document.getElementById('cari').value.toLowerCase();
+  const ids = Object.keys(penanda).filter(function (id) {
+    return !q || penanda[id].nama.toLowerCase().indexOf(q) !== -1;
+  });
+  ids.sort(function (a, b) {
+    return penanda[a].nama.localeCompare(penanda[b].nama);
+  });
+  panelDaftar.innerHTML = '<div style="padding:8px;font-weight:bold">Rumah ditandai: ' + ids.length + '</div>';
+  ids.forEach(function (id) {
+    const item = document.createElement('div');
+    item.textContent = penanda[id].nama;
+    item.style.cssText = 'padding:10px 8px;border-top:1px solid #eee;cursor:pointer';
+    item.onclick = function () {
+      const m = penanda[id];
+      if (!peta.hasLayer(m)) m.addTo(peta);
+      peta.flyTo(m.getLatLng(), 17);
+      m.openPopup();
+      panelDaftar.style.display = 'none';
+    };
+    panelDaftar.appendChild(item);
+  });
+}
+
+btnDaftar.onclick = function () {
+  if (panelDaftar.style.display === 'block') {
+    panelDaftar.style.display = 'none';
+  } else {
+    isiDaftar();
+    panelDaftar.style.display = 'block';
+  }
+};
+
+document.getElementById('cari').addEventListener('input', function () {
+  if (panelDaftar.style.display === 'block') isiDaftar();
+});
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
 </body>
